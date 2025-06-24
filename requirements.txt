@@ -1,0 +1,10 @@
+aiosqlite
+requests
+aiohttp
+numpy
+psutil
+matplotlib
+Pillow
+python-dateutil
+PyCharacterAI
+aiogram==3.13
