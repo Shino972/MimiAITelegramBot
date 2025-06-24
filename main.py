@@ -55,15 +55,20 @@ logging.basicConfig(level=logging.INFO)
 
 router = Router()
 
+chat_manager = ChatManager(
+    api_key='',  # TOKEN ACCOUNT
+    char_id='cYXxq0NFDa8lHhgtiAdv-9a534eDWbg-YiUtIfX7yoE'  # CHARACTER ID
+)
+
 DB_NAME = 'database.db'
 REQUIRED_MESSAGES = 1
-ADMIN_USER_ID = 7395604316
-STICKER_IDS = []
+ADMIN_USER_ID = # ADMIN ID
+STICKER_IDS = [] # STICKER IDS (OPTION)
 
-LOCAL_GIFS = {}
+LOCAL_GIFS = {} # LOCAL GIFTS (OPTION)
 
 async def init_db():
-    """Инициализация базы данных"""
+    """Init DB"""
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute('''
             CREATE TABLE IF NOT EXISTS message_history (
@@ -117,7 +122,6 @@ async def init_db():
             )
         ''')
 
-        # Обновленная таблица group_config
         await db.execute('''
             CREATE TABLE IF NOT EXISTS group_config (
                 chat_id INTEGER PRIMARY KEY,
@@ -125,7 +129,6 @@ async def init_db():
             )
         ''')
 
-        # Добавляем новую таблицу для премиум групп
         await db.execute('''
             CREATE TABLE IF NOT EXISTS premium_groups (
                 group_id INTEGER PRIMARY KEY,
@@ -199,11 +202,9 @@ async def init_db():
         await db.commit()
         
 async def should_send_daily_media(chat_id: int) -> bool:
-    """Проверяет, нужно ли отправлять медиа в группу сегодня"""
     current_date = datetime.now().date()
     
     async with aiosqlite.connect(DB_NAME) as db:
-        # Get last send timestamp
         cursor = await db.execute(
             'SELECT last_send_timestamp FROM media_tracking WHERE chat_id = ?',
             (chat_id,)
@@ -219,7 +220,6 @@ async def should_send_daily_media(chat_id: int) -> bool:
         return last_date < current_date
 
 async def update_last_media_timestamp(chat_id: int):
-    """Обновляет timestamp последней отправки медиа"""
     current_timestamp = int(datetime.now().timestamp())
     
     async with aiosqlite.connect(DB_NAME) as db:
@@ -230,33 +230,26 @@ async def update_last_media_timestamp(chat_id: int):
         await db.commit()
 
 async def send_random_daily_media(message: types.Message):
-    """Отправляет случайное медиа в группу"""
     try:
         if not await should_send_daily_media(message.chat.id):
             return
             
-        # 50/50 chance for sticker or GIF
         if random.random() < 0.5:
-            # Отправка стикера
             sticker_id = random.choice(STICKER_IDS)
             await message.bot.send_sticker(
                 chat_id=message.chat.id,
                 sticker=sticker_id
             )
         else:
-            # Отправка локального GIF
             random_gif_path = random.choice(list(LOCAL_GIFS.values()))
             
             try:
-                # Проверяем существование файла
                 if not os.path.exists(random_gif_path):
                     print(f"File not found: {random_gif_path}")
                     return
                     
-                # Создаем FSInputFile для локального файла
                 gif = FSInputFile(random_gif_path)
                 
-                # Отправляем анимацию
                 await message.bot.send_animation(
                     chat_id=message.chat.id,
                     animation=gif
@@ -270,7 +263,6 @@ async def send_random_daily_media(message: types.Message):
         print(f"Error sending daily media.")
 
 async def save_message_history(chat_id: int, user_id: int, message_text: str, target_user_id: Optional[int] = None):
-    """Сохранение сообщения в историю и обновление счетчика"""
     current_time = datetime.now()
     current_timestamp = int(current_time.timestamp() * 1000000)
 
@@ -281,7 +273,6 @@ async def save_message_history(chat_id: int, user_id: int, message_text: str, ta
                 VALUES (?, ?, ?, ?, ?)
             ''', (chat_id, user_id, target_user_id, message_text, current_timestamp))
 
-            # Обновляем счетчик сообщений для группы
             await db.execute('''
                 UPDATE groups 
                 SET message_count = message_count + 1 
@@ -308,7 +299,6 @@ async def save_message_history(chat_id: int, user_id: int, message_text: str, ta
                 raise e
 
 async def save_words(chat_id: int, text: str):
-    """Сохранение слов для конкретной группы"""
     words = set(re.findall(r'\b\w+\b', text.lower()))
     current_timestamp = int(datetime.now().timestamp())
     
@@ -323,7 +313,6 @@ async def save_words(chat_id: int, text: str):
 async def get_group_stats(chat_id: int) -> Dict:
     """Получение статистики группы"""
     async with aiosqlite.connect(DB_NAME) as db:
-        # Получаем количество сообщений
         async with db.execute(
             'SELECT message_count FROM groups WHERE chat_id = ?',
             (chat_id,)
@@ -331,7 +320,6 @@ async def get_group_stats(chat_id: int) -> Dict:
             message_count = await cursor.fetchone()
             message_count = message_count[0] if message_count else 0
 
-        # Получаем количество слов
         async with db.execute(
             'SELECT COUNT(DISTINCT word) FROM words WHERE chat_id = ?',
             (chat_id,)
@@ -353,7 +341,7 @@ async def show_advert(user_id: int):
         async with session.post(
             'https://api.gramads.net/ad/SendPost',
             headers={
-                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMjQ0NyIsImp0aSI6ImRkNjdlNTMwLTIyNmEtNDVkMS1iMTE5LTIzZDBiMzU1YWI2MSIsIm5hbWUiOiLwn6a0IE1pbWkgVHlwaCIsImJvdGlkIjoiMTQyNjgiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjMyNDQ3IiwibmJmIjoxNzQ0NzM0MDkyLCJleHAiOjE3NDQ5NDI4OTIsImlzcyI6IlN0dWdub3YiLCJhdWQiOiJVc2VycyJ9.IP20I6q5rGrTIgtrtBv5KhhK5opHAJxt3g6BNnc_-w4',
+                'Authorization': '',
                 'Content-Type': 'application/json',
             },
             json={'SendToChatId': user_id},
@@ -382,7 +370,6 @@ async def on_chat_member_updated(event: types.ChatMemberUpdated):
         )
 
 async def get_daily_message_stats(chat_id: int) -> List[Dict]:
-    """Получение статистики сообщений по дням"""
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute('''
             SELECT 
@@ -397,67 +384,51 @@ async def get_daily_message_stats(chat_id: int) -> List[Dict]:
             return daily_stats
 
 async def create_stats_image(chat_id: int, stats: Dict) -> BufferedInputFile:
-    """Создание изображения со статистикой"""
-    # Получаем данные по дням
     daily_stats = await get_daily_message_stats(chat_id)
     
-    # Преобразуем данные для графика
     dates = [datetime.strptime(str(row[0]), '%Y-%m-%d') for row in daily_stats]
     counts = [row[1] for row in daily_stats]
     
-    # Создаем график
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(10, 6))
     fig.patch.set_facecolor('#1a1a2e')
     ax.set_facecolor('#1a1a2e')
     
-    # Настраиваем стиль графика
     ax.grid(True, linestyle='--', alpha=0.2, color='#2d374d')
     
-    # Рисуем основную линию с неоновым эффектом
     ax.plot(dates, counts, '-', color='#00ff9d', linewidth=2, alpha=0.8)
     
-    # Добавляем точки с неоновым свечением
     ax.scatter(dates, counts, color='#00ff9d', s=50, alpha=1, 
               zorder=5, edgecolor='white', linewidth=1)
     
-    # Настраиваем оси
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m'))
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     
-    # Стилизуем подписи осей
     ax.tick_params(axis='both', colors='#8884d8')
     
-    # Добавляем легкое свечение линиям
     for spine in ax.spines.values():
         spine.set_edgecolor('#8884d8')
         spine.set_linewidth(1)
     
-    # Поворачиваем подписи дат для лучшей читаемости
     plt.xticks(rotation=45)
     
-    # Добавляем отступы
     plt.tight_layout()
     
-    # Сохраняем график в буфер
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=100, bbox_inches='tight',
                 facecolor='#1a1a2e', edgecolor='none')
     buf.seek(0)
     plt.close()
     
-    # Создаем BufferedInputFile для отправки через aiogram
     return BufferedInputFile(buf.getvalue(), filename="stats.png")
 
 @router.message(Command("stats"))
 async def stats_handler(message: types.Message):
-    """Обработчик команды /stats"""
+    """/stats"""
     if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        # Получаем статистику
         stats = await get_group_stats(message.chat.id)
         user_id = message.from_user.id
         
-        # Формируем подпись заранее
         caption = (
             f"📊 <b>Статистика группы:</b>\n"
             f"🤍 Сообщений получено: <code>{stats['messages']}</code>\n"
@@ -468,10 +439,8 @@ async def stats_handler(message: types.Message):
             caption += f"\n🤍 До активации <b>Mimi Typh</b> осталось: <code>{REQUIRED_MESSAGES - stats['messages']}</code> сообщений."
         
         try:
-            # Создаем изображение
             image = await create_stats_image(message.chat.id, stats)
             
-            # Отправляем фото с подписью
             await message.answer_photo(
                 photo=image,
                 caption=caption
@@ -480,13 +449,10 @@ async def stats_handler(message: types.Message):
             
         except Exception as e:
             print(f"Error creating stats image: {e}")
-            # Теперь caption доступна и в except блоке
             await message.answer(caption)
 
 logger = logging.getLogger(__name__)
 
-
-# Состояния для FSM
 class AdminStates(StatesGroup):
     GRANT_GROUP_ID = State()
     GRANT_GROUP_DAYS = State()
@@ -495,21 +461,17 @@ class AdminStates(StatesGroup):
 
 @router.message(Command("admin"))
 async def handle_admin_command(message: Message, state: FSMContext):
-    """Обработчик команды /admin"""
+    """/admin"""
     if message.from_user.id != ADMIN_USER_ID:
         return
 
-    # Получение статистики
     async with aiosqlite.connect(DB_NAME) as db:
-        # Общее количество пользователей
         cursor = await db.execute("SELECT COUNT(*) FROM users")
         total_users = (await cursor.fetchone())[0]
 
-        # Активные группы
         cursor = await db.execute("SELECT COUNT(*) FROM groups WHERE is_active = TRUE")
         active_groups = (await cursor.fetchone())[0]
 
-        # Список premium групп
         cursor = await db.execute("SELECT group_id, end_date FROM premium_groups")
         premium_groups = await cursor.fetchall()
     
@@ -525,7 +487,6 @@ async def handle_admin_command(message: Message, state: FSMContext):
         f"🏆 Premium-группы:\n{premium_groups_list}"
     )
 
-    # Создание клавиатуры
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🏆 Выдать Premium", callback_data="admin_grant_group_premium")],
         [InlineKeyboardButton(text="🗑 Удалить DB пользователя", callback_data="admin_delete_user")]
@@ -534,7 +495,6 @@ async def handle_admin_command(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "admin_delete_user")
 async def start_delete_user(callback: CallbackQuery, state: FSMContext):
-    """Начало процесса удаления пользователя"""
     if callback.from_user.id != ADMIN_USER_ID:
         await callback.answer("❌ Только для администратора!", show_alert=True)
         return
@@ -546,15 +506,12 @@ async def start_delete_user(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.CONFIRM_USER_DELETE)
     await callback.answer()
 
-# Обработчик для ввода ID пользователя
 @router.message(AdminStates.CONFIRM_USER_DELETE)
 async def process_user_for_deletion(message: Message, state: FSMContext, bot: Bot):
     user_id = None
     
-    # Если это пересланное сообщение
     if message.forward_from:
         user_id = message.forward_from.id
-    # Или если введен ID вручную
     elif message.text and message.text.isdigit():
         user_id = int(message.text)
     else:
@@ -562,31 +519,25 @@ async def process_user_for_deletion(message: Message, state: FSMContext, bot: Bo
         return
     
     try:
-        # Получаем информацию о пользователе
         user = await bot.get_chat(user_id)
         
-        # Получаем статистику пользователя из БД
         async with aiosqlite.connect(DB_NAME) as db:
-            # Количество сообщений
             cursor = await db.execute(
                 "SELECT COUNT(*) FROM message_history WHERE user_id = ?",
                 (user_id,))
             message_count = (await cursor.fetchone())[0]
             
-            # Количество групп
             cursor = await db.execute(
                 "SELECT COUNT(DISTINCT chat_id) FROM message_history WHERE user_id = ?",
                 (user_id,))
             groups_count = (await cursor.fetchone())[0]
             
-            # Дата регистрации
             cursor = await db.execute(
                 "SELECT joined_timestamp FROM users WHERE user_id = ?",
                 (user_id,))
             join_data = await cursor.fetchone()
             join_date = datetime.fromtimestamp(join_data[0]).strftime('%d.%m.%Y') if join_data else "неизвестно"
         
-        # Формируем информационную карточку
         user_card = (
             f"👤 <b>Информация о пользователе</b>\n\n"
             f"🆔 ID: <code>{user_id}</code>\n"
@@ -599,7 +550,6 @@ async def process_user_for_deletion(message: Message, state: FSMContext, bot: Bo
             f"<b>❗️ Внимание! Это действие удалит ВСЕ данные пользователя без возможности восстановления!</b>"
         )
         
-        # Создаем клавиатуру подтверждения
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(
@@ -613,10 +563,8 @@ async def process_user_for_deletion(message: Message, state: FSMContext, bot: Bo
             ]
         ])
         
-        # Сохраняем ID пользователя в состоянии
         await state.update_data(user_id=user_id)
         
-        # Отправляем карточку с кнопками подтверждения
         await message.answer(user_card, reply_markup=keyboard)
         
     except Exception as e:
@@ -628,7 +576,6 @@ async def process_user_for_deletion(message: Message, state: FSMContext, bot: Bo
         await message.answer(error_msg)
         await state.clear()
 
-# Обработчик подтверждения удаления
 @router.callback_query(F.data.startswith("confirm_delete_"))
 async def confirm_user_deletion(callback: CallbackQuery, state: FSMContext, bot: Bot):
     if callback.from_user.id != ADMIN_USER_ID:
@@ -638,23 +585,18 @@ async def confirm_user_deletion(callback: CallbackQuery, state: FSMContext, bot:
     user_id = int(callback.data.split("_")[2])
     
     try:
-        # Получаем информацию о пользователе для логов
         user = await bot.get_chat(user_id)
         
-        # Удаляем все данные пользователя
         async with aiosqlite.connect(DB_NAME) as db:
-            # Удаляем из всех таблиц
             await db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
             await db.execute("DELETE FROM message_history WHERE user_id = ?", (user_id,))
             await db.execute("DELETE FROM last_button_press WHERE user_id = ?", (user_id,))
             await db.commit()
             
-            # Проверяем, что удаление прошло успешно
             cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
             if await cursor.fetchone():
                 raise Exception("Не удалось удалить пользователя из базы данных")
         
-        # Формируем сообщение об успехе
         success_msg = (
             f"✅ Пользователь <code>{user_id}</code> успешно удален!\n\n"
             f"📛 Имя: {html.escape(user.first_name)}\n"
@@ -662,13 +604,10 @@ async def confirm_user_deletion(callback: CallbackQuery, state: FSMContext, bot:
             f"Все данные безвозвратно удалены из системы."
         )
         
-        # Удаляем сообщение с подтверждением
         await callback.message.delete()
         
-        # Отправляем сообщение об успехе
         await callback.message.answer(success_msg)
         
-        # Логируем действие
         logger.warning(f"Администратор удалил пользователя {user_id} ({user.first_name})")
         
     except Exception as e:
@@ -681,14 +620,12 @@ async def confirm_user_deletion(callback: CallbackQuery, state: FSMContext, bot:
     await state.clear()
     await callback.answer()
 
-# Обработчик отмены удаления
 @router.callback_query(F.data == "cancel_delete")
 async def cancel_user_deletion(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("❌ Удаление пользователя отменено.")
     await state.clear()
     await callback.answer()
 
-# Обработчик кнопки выдачи premium группе
 @router.callback_query(F.data == "admin_grant_group_premium")
 async def start_grant_group_premium(callback: CallbackQuery, state: FSMContext):
     """Начало процесса выдачи premium группе"""
@@ -696,18 +633,14 @@ async def start_grant_group_premium(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.GRANT_GROUP_ID)
     await callback.answer()
 
-# Обработчик ввода ID группы
 @router.message(AdminStates.GRANT_GROUP_ID)
 async def process_group_id(message: Message, state: FSMContext, bot: Bot):
     """Обработка ID группы с проверкой её существования"""
     try:
         group_id = int(message.text)
-        
-        # Проверяем, существует ли группа и есть ли у бота права
         try:
             chat = await bot.get_chat(group_id)
             
-            # Проверяем, что бот является администратором группы
             bot_member = await bot.get_chat_member(group_id, bot.id)
             if not bot_member.status == ChatMemberStatus.ADMINISTRATOR:
                 await message.answer("❌ Бот не является администратором в этой группе!")
@@ -729,10 +662,8 @@ async def process_group_id(message: Message, state: FSMContext, bot: Bot):
         await message.answer("❌ Ошибка! Введите числовой ID группы.")
         await state.clear()
 
-# Обработчик ввода дней для группы
 @router.message(AdminStates.GRANT_GROUP_DAYS)
 async def process_group_premium_days(message: Message, state: FSMContext, bot: Bot):
-    """Обработка количества дней для группы с восстановлением бэкапа"""
     try:
         days = int(message.text)
         if days <= 0:
@@ -745,7 +676,6 @@ async def process_group_premium_days(message: Message, state: FSMContext, bot: B
         end_date = now + relativedelta(days=days)
         
         async with aiosqlite.connect(DB_NAME) as db:
-            # Проверяем наличие бэкапа
             cursor = await db.execute('''
                 SELECT settings_json, modules_json 
                 FROM group_settings_backup 
@@ -753,14 +683,12 @@ async def process_group_premium_days(message: Message, state: FSMContext, bot: B
             ''', (group_id,))
             backup = await cursor.fetchone()
             
-            # Обновление premium для группы
             await db.execute('''
                 INSERT OR REPLACE INTO premium_groups 
                 (group_id, user_id, end_date) 
                 VALUES (?, ?, ?)
             ''', (group_id, ADMIN_USER_ID, end_date.isoformat()))
             
-            # Восстанавливаем настройки из бэкапа, если они есть
             if backup:
                 settings = json.loads(backup[0])
                 modules = json.loads(backup[1])
@@ -780,14 +708,12 @@ async def process_group_premium_days(message: Message, state: FSMContext, bot: B
             
             await db.commit()
 
-        # Уведомление
         await message.answer(
             f"✅ Группе <code>{group_id}</code> выдан premium до "
             f"{end_date.strftime('%d.%m.%Y %H:%M')}\n"
             f"{'🔧 Настройки группы восстановлены из бэкапа' if backup else ''}"
         )
         
-        # Попытка уведомить группу
         try:
             await bot.send_message(
                 group_id,
@@ -809,7 +735,6 @@ async def process_group_premium_days(message: Message, state: FSMContext, bot: B
 
 available_modules = ['ping', 'bansticker', 'triggers', 'pl']
 
-# Стоимость подписок для групп в XTR
 group_subscription_prices = {
     1: 100,   # 200 руб. / 2 = 100 XTR
     3: 280,    # 559 руб. / 2 = 280 XTR
@@ -818,7 +743,6 @@ group_subscription_prices = {
     12: 900    # 1799 руб. / 2 = 900 XTR
 }
 
-# Клавиатура с тарифами для групп
 def get_group_premium_keyboard(group_id: int, initiator_id: int):
     buttons = [
         [InlineKeyboardButton(text="100⭐/месяц", callback_data=f"gpremium_{group_id}_1_{initiator_id}")],
@@ -857,7 +781,6 @@ async def get_group_config_keyboard(chat_id: int, has_premium: bool, response_ch
     
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# Глобальный словарь для хранения времени последнего нажатия кнопок
 last_press_times = {}
 
 async def check_flood(user_id: int, interval: int = 1) -> bool:
@@ -871,7 +794,6 @@ async def check_flood(user_id: int, interval: int = 1) -> bool:
     return False
 
 async def check_group_premium_status(group_id: int) -> bool:
-    """Проверяет, есть ли у группы активная премиум-подписка"""
     async with aiosqlite.connect('database.db') as db:
         cursor = await db.execute(
             'SELECT end_date FROM premium_groups WHERE group_id = ?',
@@ -1000,7 +922,6 @@ async def process_group_premium_purchase(callback: CallbackQuery, bot: Bot):
         return
 
     try:
-        # Проверяем, не заблокировал ли пользователь бота
         try:
             await bot.send_chat_action(user_id, "typing")
         except Exception as e:
@@ -1011,7 +932,6 @@ async def process_group_premium_purchase(callback: CallbackQuery, bot: Bot):
                 await callback.answer("❌ Ваш аккаунт удален.", show_alert=True)
                 return
 
-        # Проверяем регистрацию пользователя
         async with aiosqlite.connect('database.db') as db:
             cursor = await db.execute(
                 'SELECT 1 FROM users WHERE user_id = ?',
@@ -1026,13 +946,11 @@ async def process_group_premium_purchase(callback: CallbackQuery, bot: Bot):
                 )
                 return
 
-        # Проверяем права администратора
         member = await bot.get_chat_member(group_id, user_id)
         if member.status not in ["administrator", "creator"]:
             await callback.answer("❌ Нужны права админа!", show_alert=True)
             return
         
-        # Проверяем кулдаун
         async with aiosqlite.connect('database.db') as db:
             cursor = await db.execute(
                 'SELECT last_press_time FROM last_button_press WHERE user_id = ?',
@@ -1064,12 +982,11 @@ async def pre_checkout_handler(pre_checkout_query: PreCheckoutQuery):
 
 async def send_group_invoice(user_id: int, group_id: int, months: int, amount_xtr: int, bot: Bot):
     try:
-        # Получаем информацию о группе
         chat = await bot.get_chat(group_id)
         group_name = chat.title
     except Exception as e:
         print(f"Ошибка при получении информации о группе: {e}")
-        group_name = "группы"  # Фолбек на случай ошибки
+        group_name = "группы"
 
     prices = [LabeledPrice(label=f'Group Premium на {months} мес.', amount=amount_xtr)]
     
@@ -1096,7 +1013,6 @@ async def process_successful_group_payment(message: Message):
     
     now = datetime.now()
     async with aiosqlite.connect('database.db') as db:
-        # Проверяем наличие бэкапа
         cursor = await db.execute('''
             SELECT settings_json, modules_json 
             FROM group_settings_backup 
@@ -1104,7 +1020,6 @@ async def process_successful_group_payment(message: Message):
         ''', (group_id,))
         backup = await cursor.fetchone()
         
-        # Устанавливаем дату окончания подписки
         cursor = await db.execute(
             'SELECT end_date FROM premium_groups WHERE group_id = ?',
             (group_id,)
@@ -1121,7 +1036,6 @@ async def process_successful_group_payment(message: Message):
             (group_id, user_id, end_date) VALUES (?, ?, ?)
         ''', (group_id, user_id, new_end_date.isoformat()))
         
-        # Восстанавливаем настройки из бэкапа, если они есть
         if backup:
             settings = json.loads(backup[0])
             modules = json.loads(backup[1])
@@ -1157,7 +1071,6 @@ async def process_successful_group_payment(message: Message):
         f"📅 До: {new_end_date.strftime('%d.%m.%Y %H:%M')}"
     )
 
-# Определяем состояния
 class FreePremiumStates(StatesGroup):
     waiting_for_link = State()
 
@@ -1336,7 +1249,7 @@ async def process_views(message: types.Message, state: FSMContext, bot: Bot):
         group_id = data['group_id']
         user_id = data['user_id']
         
-        days = (views // 2000) * 30  # Округляем вниз, 2000 просмотров = 30 дней
+        days = (views // 2000) * 30
         now = datetime.now()
         async with aiosqlite.connect('database.db') as db:
             cursor = await db.execute(
@@ -1387,7 +1300,6 @@ async def check_expired_group_premium(bot: Bot):
             
             for group_id, user_id, end_date in expired_groups:
                 try:
-                    # Получаем информацию о группе
                     chat = await bot.get_chat(group_id)
                     group_name = chat.title
                     group_mention = f'<a href="tg://user?id={group_id}">{html.escape(group_name)}</a>'
@@ -1395,7 +1307,6 @@ async def check_expired_group_premium(bot: Bot):
                     print(f"Ошибка получения информации о группе {group_id}: {e}")
                     group_mention = f"группы {group_id}"
 
-                # Получаем текущие настройки группы
                 cursor = await db.execute('''
                     SELECT response_chance FROM group_config 
                     WHERE chat_id = ?
@@ -1408,7 +1319,6 @@ async def check_expired_group_premium(bot: Bot):
                 ''', (group_id,))
                 modules = await cursor.fetchall()
                 
-                # Сохраняем настройки в бэкап
                 settings_json = json.dumps({'response_chance': config[0] if config else 1})
                 modules_json = json.dumps(dict(modules))
                 
@@ -1418,7 +1328,6 @@ async def check_expired_group_premium(bot: Bot):
                     VALUES (?, ?, ?, ?)
                 ''', (group_id, settings_json, modules_json, datetime.now().isoformat()))
                 
-                # Сбрасываем настройки на значения по умолчанию
                 await db.execute('DELETE FROM group_config WHERE chat_id = ?', (group_id,))
                 await db.execute('DELETE FROM group_modules WHERE group_id = ?', (group_id,))
                 await db.execute('DELETE FROM premium_groups WHERE group_id = ?', (group_id,))
@@ -1551,7 +1460,6 @@ async def generate_modules_interface(
     user_id: int,
     first_name: str
 ) -> None:
-    """Генерирует интерфейс управления модулями с упоминанием пользователя"""
     try:
         async with aiosqlite.connect('database.db') as db:
             cursor = await db.execute(
@@ -1610,12 +1518,10 @@ async def manage_modules_handler(callback: CallbackQuery, bot: Bot):
             await callback.answer("❌ Требуется Premium подписка!", show_alert=True)
             return
 
-        # Проверка прав
         if user_id != initiator_id:
             await callback.answer("❌ Не твоя кнопка!", show_alert=True)
             return
 
-        # Проверка прав администратора
         try:
             member = await bot.get_chat_member(group_id, user_id)
             if member.status not in ["administrator", "creator"]:
@@ -1625,7 +1531,6 @@ async def manage_modules_handler(callback: CallbackQuery, bot: Bot):
             await callback.answer("⚠️ Упс, ошибка...", show_alert=True)
             return
         
-        # Обновляем интерфейс
         await generate_modules_interface(
             group_id=group_id,
             initiator_id=initiator_id,
@@ -1706,11 +1611,9 @@ async def toggle_module_handler(callback: CallbackQuery, bot: Bot):
 @router.message(lambda m: m.text and m.text.startswith(".module"))
 async def handle_module_command(message: Message, bot: Bot):
     try:
-        # Удаляем сообщение с командой ДО обработки
         await message.delete()
     except Exception as e:
         logging.error(f"Ошибка при удалении сообщения: {e}")
-        # Продолжаем выполнение, даже если не удалось удалить сообщение
 
     user_id = message.from_user.id
     chat_id = message.chat.id
@@ -1768,13 +1671,11 @@ async def process_module_command(group_id: int, args: list) -> str:
             ''', (group_id,))
             active_modules = await cursor.fetchall()
             
-            # Проверяем, что активные модули существуют в available_modules
             valid_active_modules = []
             for module in active_modules:
                 if module[0] in available_modules:
                     valid_active_modules.append(module[0])
                 else:
-                    # Удаляем несуществующие модули из базы
                     await db.execute('''
                         DELETE FROM group_modules 
                         WHERE group_id = ? AND module_name = ?
@@ -1793,7 +1694,6 @@ async def process_module_command(group_id: int, args: list) -> str:
             return f"❌ Модуль <code>{html.escape(module_name)}</code> не существует. Используйте <code>.module -ls</code> для списка доступных модулей."
         
         async with aiosqlite.connect('database.db') as db:
-            # Дополнительная проверка, что модуль существует
             if module_name not in available_modules:
                 return f"❌ Модуль <code>{html.escape(module_name)}</code> не доступен."
                 
@@ -1808,12 +1708,10 @@ async def process_module_command(group_id: int, args: list) -> str:
     if args[0] == '-d' and len(args) >= 2:
         module_name = args[1]
         
-        # Проверяем, что модуль существует перед деактивацией
         if module_name not in available_modules:
             return f"❌ Модуль <code>{html.escape(module_name)}</code> не существует."
             
         async with aiosqlite.connect('database.db') as db:
-            # Проверяем, что модуль был активен
             cursor = await db.execute('''
                 SELECT 1 FROM group_modules 
                 WHERE group_id = ? AND module_name = ? AND is_active = 1
@@ -1834,35 +1732,33 @@ async def process_module_command(group_id: int, args: list) -> str:
     return "❌ Неверная команда. Используйте <code>.module help</code> для справки."
 
 async def get_real_server_info():
-    # 1. Получаем информацию о системе
+    # 1.SYSTEM INFO
     system_info = {
         "system": platform.system(),
         "release": platform.release(),
         "machine": platform.machine(),
     }
     
-    # 2. Получаем использование RAM
+    # 2. RAM INFO
     ram = psutil.virtual_memory()
     ram_usage = f"{ram.percent}% ({ram.used / (1024**3):.1f} GB / {ram.total / (1024**3):.1f} GB)"
     
-    # 3. Получаем аптайм системы
+    # 3. UPTIME
     boot_time = datetime.fromtimestamp(psutil.boot_time())
     uptime = datetime.now() - boot_time
     uptime_str = str(uptime).split('.')[0]  # Убираем микросекунды
     
-    # 4. Получаем информацию о процессоре
+    # 4. CPU
     cpu_usage = f"{psutil.cpu_percent()}%"
     cpu_count = psutil.cpu_count()
     
-    # 5. Получаем информацию о диске
+    # 5. DISK
     disk = psutil.disk_usage('/')
     disk_usage = f"{disk.percent}% ({disk.used / (1024**3):.1f} GB / {disk.total / (1024**3):.1f} GB)"
     
-    # 6. Определяем реальное расположение сервера Telegram
+    # 6. TG LOCATION
     try:
-        # Получаем IP Telegram API
         telegram_ip = socket.gethostbyname("api.telegram.org")
-        # Используем сервис для определения локации по IP
         response = requests.get(f"https://ipinfo.io/{telegram_ip}/json").json()
         telegram_location = f"{response.get('country', '?')}, {response.get('city', 'Unknown')}"
         telegram_org = response.get('org', 'Unknown')
@@ -1870,14 +1766,14 @@ async def get_real_server_info():
         telegram_location = "Не удалось определить"
         telegram_org = "Неизвестно"
     
-    # 7. Проверяем блокировки Telegram в России
+    # 7. RUSSIAN AVIALABLE
     try:
         russian_block = requests.get("https://api.telegram.org", timeout=5).ok
         russian_block_status = "🔴 Заблокирован (РКН)" if not russian_block else "🟢 Доступен"
     except:
         russian_block_status = "🔴 Заблокирован (РКН)"
     
-    # 8. Сетевая статистика
+    # 8. NETWORK STATS
     net_io = psutil.net_io_counters()
     network_usage = {
         "bytes_sent": f"{net_io.bytes_sent / (1024**2):.2f} MB",
@@ -1887,10 +1783,10 @@ async def get_real_server_info():
     }
     
     return {
-        "server_location": "🇳🇱 Нидерланды, Amsterdam",  # Расположение вашего сервера
-        "telegram_location": telegram_location,  # Реальное расположение центра Telegram
-        "telegram_org": telegram_org,  # Организация, владеющая IP Telegram
-        "russian_block_status": russian_block_status,  # Статус блокировки в РФ
+        "server_location": "🇳🇱 Нидерланды, Amsterdam",
+        "telegram_location": telegram_location,
+        "telegram_org": telegram_org,
+        "russian_block_status": russian_block_status,
         "system": f"{system_info['system']} {system_info['release']} ({system_info['machine']})",
         "ram_usage": ram_usage,
         "cpu_usage": f"{cpu_usage} ({cpu_count} ядер)",
@@ -1899,16 +1795,13 @@ async def get_real_server_info():
         "network_usage": network_usage
     }
 
-# Обновленная команда ping
 @router.message(Command("ping", prefix="!/."))
 @router.message(F.text.lower().in_(["пинг", ".пинг", "бот", ".бот"]))
 async def ping_command(message: Message):
-    """Проверка работоспособности модуля с реальными метриками"""
     chat_id = message.chat.id
     user_id = message.from_user.id
     first_name = message.from_user.first_name
-    
-    # Проверка доступности модуля (новая структура БД)
+
     async with aiosqlite.connect('database.db') as db:
         cursor = await db.execute(
             'SELECT is_active FROM group_modules WHERE group_id = ? AND module_name = "ping"',
@@ -1919,13 +1812,11 @@ async def ping_command(message: Message):
     if not result or not result[0]:
         return
     
-    # Измерение пинга
     start_time = time.time()
     msg = await message.answer("🏓 Измерение пинга и сбор системной информации...")
     end_time = time.time()
     ping = round((end_time - start_time) * 1000, 2)
-    
-    # Получение реальных данных
+
     try:
         server_info = await get_real_server_info()
         response = (
@@ -1975,7 +1866,6 @@ async def execute_code(language: str, version: str, code: str) -> Optional[Dict]
                 if response.status == 200:
                     return await response.json()
                 
-                # Логируем ошибку API
                 error_text = await response.text()
                 print(f"Piston API error {response.status}: {error_text}")
                 return None
@@ -1989,7 +1879,6 @@ async def execute_code(language: str, version: str, code: str) -> Optional[Dict]
 
 @router.message(lambda m: m.text and m.text.startswith(".pl"))
 async def pl_command_handler(message: Message, bot: Bot):
-    # Проверка активности модуля
     chat_id = message.chat.id
     async with aiosqlite.connect('database.db') as db:
         cursor = await db.execute(
@@ -1999,8 +1888,6 @@ async def pl_command_handler(message: Message, bot: Bot):
         result = await cursor.fetchone()
         if not result or not result[0]:
             return
-
-    # Удаление сообщения команды
     try:
         await message.delete()
     except:
@@ -2011,7 +1898,6 @@ async def pl_command_handler(message: Message, bot: Bot):
     args = message.text.split()[1:]
     
     if not args:
-        # Выводим справку если команда без аргументов
         help_text = (
             f"👤 <a href=\"tg://user?id={user_id}\">{first_name}</a>\n\n"
             "📚 <b>Справка по командам .pl</b>\n\n"
@@ -2033,13 +1919,10 @@ async def pl_command_handler(message: Message, bot: Bot):
         if not languages:
             await message.answer(f"👤 <a href=\"tg://user?id={user_id}\">{first_name}</a>\n\n🚫 Не удалось получить список языков")
             return
-        
-        # Разбиваем языки на страницы по 15 элементов
         PAGE_SIZE = 15
         pages = [languages[i:i + PAGE_SIZE] for i in range(0, len(languages), PAGE_SIZE)]
         current_page = 0
         
-        # Формируем текст первой страницы
         lang_list = []
         for idx, lang in enumerate(pages[current_page], 1):
             lang_num = current_page * PAGE_SIZE + idx
@@ -2051,24 +1934,21 @@ async def pl_command_handler(message: Message, bot: Bot):
             "\n".join(lang_list)
         )
         
-        # Создаем клавиатуру с пагинацией
         keyboard = []
         if len(pages) > 1:
             nav_buttons = []
-            # Показываем кнопку "Назад" только если это не первая страница
             if current_page > 0:
                 nav_buttons.append(InlineKeyboardButton(
                     text="◀️ Назад", 
                     callback_data=f"pl_langs_{chat_id}_{user_id}_{current_page - 1}"
                 ))
-            # Всегда показываем "Вперед" если есть следующая страница
             if current_page < len(pages) - 1:
                 nav_buttons.append(InlineKeyboardButton(
                     text="▶️ Вперед", 
                     callback_data=f"pl_langs_{chat_id}_{user_id}_{current_page + 1}"
                 ))
             
-            if nav_buttons:  # Добавляем строку навигации только если есть кнопки
+            if nav_buttons:
                 keyboard.append(nav_buttons)
         
         keyboard.append([
@@ -2095,7 +1975,6 @@ async def pl_command_handler(message: Message, bot: Bot):
         lang_name = args[1].lower()
         code = message.reply_to_message.text
         
-        # Добавляем индикатор выполнения
         processing_msg = await message.answer(f"👤 <a href=\"tg://user?id={user_id}\">{first_name}</a>\n\n⚙️ Выполняю код...")
         
         languages = await get_supported_languages()
@@ -2103,7 +1982,6 @@ async def pl_command_handler(message: Message, bot: Bot):
             await processing_msg.edit_text(f"👤 <a href=\"tg://user?id={user_id}\">{first_name}</a>\n\n🚫 Сервис выполнения кода недоступен")
             return
 
-        # Ищем язык (регистронезависимо)
         target_lang = None
         for lang in languages:
             if lang['language'].lower() == lang_name:
@@ -2114,7 +1992,6 @@ async def pl_command_handler(message: Message, bot: Bot):
             await processing_msg.edit_text(f"👤 <a href=\"tg://user?id={user_id}\">{first_name}</a>\n\n🚫 Язык <code>{html.escape(lang_name)}</code> не поддерживается")
             return
 
-        # Выполняем код
         result = await execute_code(
             language=target_lang['language'],
             version=target_lang['version'],
@@ -2149,7 +2026,6 @@ async def pl_command_handler(message: Message, bot: Bot):
             await message.answer(f"👤 <a href=\"tg://user?id={user_id}\">{first_name}</a>\n\n🚫 Сервис недоступен")
             return
 
-        # Ищем все версии языка
         versions = []
         lang_display_name = None
         for lang in languages:
@@ -2197,7 +2073,6 @@ async def handle_langs_pagination(callback: CallbackQuery, bot: Bot):
         if not module_active or not module_active[0]:
             return
     
-    # Проверяем права пользователя
     if callback.from_user.id != user_id:
         await callback.answer("❌ Не твоя кнопка!", show_alert=True)
         return
@@ -2214,10 +2089,8 @@ async def handle_langs_pagination(callback: CallbackQuery, bot: Bot):
     PAGE_SIZE = 15
     pages = [languages[i:i + PAGE_SIZE] for i in range(0, len(languages), PAGE_SIZE)]
     
-    # Корректируем номер страницы если вышли за границы
     page = max(0, min(page, len(pages) - 1))
     
-    # Формируем текст страницы
     lang_list = []
     for idx, lang in enumerate(pages[page], 1):
         lang_num = page * PAGE_SIZE + idx
@@ -2229,7 +2102,6 @@ async def handle_langs_pagination(callback: CallbackQuery, bot: Bot):
         "\n".join(lang_list)
     )
     
-    # Обновляем клавиатуру
     keyboard = []
     if len(pages) > 1:
         nav_buttons = []
@@ -2252,7 +2124,6 @@ async def handle_close_menu(callback: CallbackQuery, bot: Bot):
     chat_id = int(data[2])
     user_id = int(data[3])
     
-    # Проверка доступности модуля
     async with aiosqlite.connect('database.db') as db:
         cursor = await db.execute(
             'SELECT is_active FROM group_modules WHERE group_id = ? AND module_name = "pl"',
@@ -2263,7 +2134,6 @@ async def handle_close_menu(callback: CallbackQuery, bot: Bot):
         if not module_active or not module_active[0]:
             return
     
-    # Проверяем права пользователя
     if callback.from_user.id != user_id:
         await callback.answer("❌ Не твоя кнопка!", show_alert=True)
         return
@@ -2278,17 +2148,9 @@ async def handle_close_menu(callback: CallbackQuery, bot: Bot):
     except Exception as e:
         await callback.answer("❌ Не удалось закрыть меню", show_alert=True)
 
-
-
-
-
-
-
-
 standard_triggers = {'мими', 'mimi', 'МИМИ', 'MIMI', 'Мими', 'Mimi'}
 
 async def add_trigger(group_id: int, trigger: str) -> bool:
-    """Добавляет триггер для группы"""
     async with aiosqlite.connect(DB_NAME) as db:
         try:
             await db.execute('''
@@ -2301,7 +2163,6 @@ async def add_trigger(group_id: int, trigger: str) -> bool:
             return False
 
 async def remove_trigger(group_id: int, trigger: str) -> bool:
-    """Удаляет триггер для группы"""
     async with aiosqlite.connect(DB_NAME) as db:
         cursor = await db.execute('''
             DELETE FROM group_triggers 
@@ -2311,7 +2172,6 @@ async def remove_trigger(group_id: int, trigger: str) -> bool:
         return cursor.rowcount > 0
 
 async def get_group_triggers(group_id: int) -> List[str]:
-    """Получает все триггеры для группы"""
     async with aiosqlite.connect(DB_NAME) as db:
         cursor = await db.execute('''
             SELECT trigger FROM group_triggers
@@ -2323,7 +2183,6 @@ async def get_group_triggers(group_id: int) -> List[str]:
 
 @router.message(Command("triggers", prefix="."))
 async def handle_triggers_command(message: Message, bot: Bot):
-    """Обработчик команд управления триггерами"""
     chat_id = message.chat.id
     user_id = message.from_user.id
     first_name = html.escape(message.from_user.first_name)
@@ -2331,7 +2190,6 @@ async def handle_triggers_command(message: Message, bot: Bot):
     if message.chat.type not in ["group", "supergroup"]:
         return
     
-    # Проверяем права администратора
     try:
         member = await bot.get_chat_member(chat_id, user_id)
         if member.status not in ["administrator", "creator"]:
@@ -2341,7 +2199,6 @@ async def handle_triggers_command(message: Message, bot: Bot):
         await message.reply("❌ Ошибка проверки прав.")
         return
     
-    # Проверяем активность модуля triggers
     async with aiosqlite.connect('database.db') as db:
         cursor = await db.execute(
             'SELECT is_active FROM group_modules WHERE group_id = ? AND module_name = "triggers"',
@@ -2352,11 +2209,9 @@ async def handle_triggers_command(message: Message, bot: Bot):
         if not module_active or not module_active[0]:
             return
     
-    # Разбираем аргументы команды
     args = message.text.split()[1:]
     
     if not args:
-        # Показать текущие триггеры
         triggers = await get_group_triggers(chat_id)
         if triggers:
             response = (
@@ -2371,7 +2226,6 @@ async def handle_triggers_command(message: Message, bot: Bot):
     subcommand = args[0].lower()
     
     if subcommand == "add" and len(args) >= 2:
-        # Добавление триггера
         trigger = ' '.join(args[1:]).strip()
         if await add_trigger(chat_id, trigger):
             await message.reply(f"✅ Триггер <code>{html.escape(trigger)}</code> успешно добавлен!")
@@ -2379,7 +2233,6 @@ async def handle_triggers_command(message: Message, bot: Bot):
             await message.reply(f"ℹ️ Триггер <code>{html.escape(trigger)}</code> уже существует.")
     
     elif subcommand == "remove" and len(args) >= 2:
-        # Удаление триггера
         trigger = ' '.join(args[1:]).strip()
         if await remove_trigger(chat_id, trigger):
             await message.reply(f"✅ Триггер <code>{html.escape(trigger)}</code> успешно удалён!")
@@ -2387,14 +2240,12 @@ async def handle_triggers_command(message: Message, bot: Bot):
             await message.reply(f"❌ Триггер <code>{html.escape(trigger)}</code> не найден.")
     
     elif subcommand == "reset":
-        # Сброс триггеров
         async with aiosqlite.connect('database.db') as db:
             await db.execute('DELETE FROM group_triggers WHERE group_id = ?', (chat_id,))
             await db.commit()
         await message.reply("✅ Все триггеры сброшены. Будут использоваться стандартные.")
     
     else:
-        # Неверная команда
         help_text = (
             f"<a href=\"tg://user?id={user_id}\">{first_name}</a>, использование команды:\n\n"
             "<code>.triggers</code> - показать текущие триггеры\n"
@@ -2403,24 +2254,15 @@ async def handle_triggers_command(message: Message, bot: Bot):
             "<code>.triggers reset</code> - сбросить все триггеры"
         )
         await message.reply(help_text)
-
-
-
-
-
-
-
-# Обработчик команды /bansticker
+        
 @router.message(Command("bansticker"))
 async def banstick_command(message: Message, bot: Bot):
     await handle_ban_command(message, bot, ban_type="sticker")
 
-# Обработчик команды /banstickerpack
 @router.message(Command("banstickerpack"))
 async def banpack_command(message: Message, bot: Bot):
     await handle_ban_command(message, bot, ban_type="pack")
 
-# Общая функция для обработки команд /bansticker и /banstickerpack
 async def handle_ban_command(message: Message, bot: Bot, ban_type: str):
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -2473,7 +2315,6 @@ async def handle_ban_command(message: Message, bot: Bot, ban_type: str):
             await message.reply(f"<a href=\"tg://user?id={user_id}\">{first_name}</a>, стикерпак <code>{pack_name}</code> заблокирован.")
             await bot.delete_message(chat_id, message.reply_to_message.message_id)
 
-# Обработчик команды /unsticker
 @router.message(Command("unsticker"))
 async def unstick_command(message: Message, bot: Bot):
     chat_id = message.chat.id
@@ -2548,7 +2389,6 @@ async def show_blocked_list(message: Message, bot: Bot):
 
     await message.reply(response)
 
-# Функция для разблокировки стикера или стикерпака
 async def unblock_item(message: Message, bot: Bot, item_id: str):
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -2575,7 +2415,6 @@ async def unblock_item(message: Message, bot: Bot, item_id: str):
 
     await message.reply(f"<a href=\"tg://user?id={user_id}\">{first_name}</a>, не найден заблокированный стикер.")
 
-# Custom filter for regex matching on inline queries
 class RegexpInlineQueryFilter(BaseFilter):
     def __init__(self, regexp: str, flags: int = 0):
         self.regexp = regexp
@@ -2587,16 +2426,14 @@ class RegexpInlineQueryFilter(BaseFilter):
             return {"match": match}
         return False
 
-# Define the regex pattern for the inline query
 pattern = r'^hide\s+(\d+|-?\d+)\s+(.+)'
 flags = re.IGNORECASE
 
 @router.inline_query(RegexpInlineQueryFilter(regexp=pattern, flags=flags))
 async def handle_inline_hide(inline_query: InlineQuery, bot: Bot, match: re.Match):
-    target_id_str = match.group(1)  # ID of the target user
-    message_text = match.group(2).strip()  # Hidden message text
+    target_id_str = match.group(1)
+    message_text = match.group(2).strip()
 
-    # Check message length
     if len(message_text) > 200:
         await inline_query.answer(
             results=[],
@@ -2605,7 +2442,6 @@ async def handle_inline_hide(inline_query: InlineQuery, bot: Bot, match: re.Matc
         )
         return
 
-    # Default chat ID to creator's user ID
     chat_id = inline_query.from_user.id
     creator_id = inline_query.from_user.id
 
@@ -2619,7 +2455,6 @@ async def handle_inline_hide(inline_query: InlineQuery, bot: Bot, match: re.Matc
         )
         return
 
-    # Generate a unique message ID and store it in the database
     message_id = str(uuid4())
     async with aiosqlite.connect('database.db') as db:
         await db.execute('''
@@ -2628,12 +2463,10 @@ async def handle_inline_hide(inline_query: InlineQuery, bot: Bot, match: re.Matc
         ''', (message_id, chat_id, creator_id, target_user_id, message_text))
         await db.commit()
 
-    # Create inline keyboard with a "Reveal" button
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💭 Раскрыть", callback_data=f"reveal_{message_id}")]
     ])
 
-    # Display target user as ID
     target_display = f"ID {target_user_id}"
     result = InlineQueryResultArticle(
         id=message_id,
@@ -2652,7 +2485,6 @@ async def handle_reveal_callback(callback: CallbackQuery, bot: Bot):
     user_id = callback.from_user.id
     chat_id = callback.message.chat.id if callback.message else user_id
 
-    # Retrieve the hidden message from the database
     async with aiosqlite.connect('database.db') as db:
         cursor = await db.execute(
             'SELECT creator_id, target_user_id, message_text FROM hidden_messages WHERE message_id = ?',
@@ -2666,12 +2498,10 @@ async def handle_reveal_callback(callback: CallbackQuery, bot: Bot):
         
         creator_id, target_user_id, message_text = result
         
-        # Check if the user is either the creator or the target
         if user_id not in [creator_id, target_user_id]:
             await callback.answer("☠ Anti-Piracy Screen ☠\n\tYour information is being sent to the proper authorities.\n\tDo not attempt to turn on the button again.\n\tPiracy carries up to 10 years imprisonment and a 10,000 fine", show_alert=True)
             return
-        
-        # Reveal the hidden message
+
         await callback.answer(message_text, show_alert=True)
 
 @router.message(F.sticker)
@@ -2710,10 +2540,11 @@ async def check_sticker(message: Message, bot: Bot):
 #==============================================================================================
 #==============================================================================================
 #==============================================================================================
+
 class MessageTracker:
     def __init__(self, message_limit: int = 3, time_window: int = 5):
         self.message_limit = message_limit
-        self.time_window = time_window  # в секундах
+        self.time_window = time_window
         self.user_messages: Dict[int, deque] = {}
         
     def is_spam(self, user_id: int) -> bool:
@@ -2723,16 +2554,13 @@ class MessageTracker:
         messages = self.user_messages[user_id]
         current_time = datetime.now()
         
-        # Удаляем старые сообщения за пределами временного окна
         while messages and (current_time - messages[0]) > timedelta(seconds=self.time_window):
             messages.popleft()
             
-        # Проверяем, не превышен ли лимит сообщений
         if len(messages) >= self.message_limit:
             logger.warning(f"Spam detected from user {user_id}: {len(messages)} messages in {self.time_window} seconds")
             return True
             
-        # Добавляем новое сообщение в историю
         messages.append(current_time)
         return False
 
@@ -2740,7 +2568,7 @@ class ConnectionPool:
     def __init__(self, api_key: str, pool_size: int = 5):
         self.api_key = api_key
         self.pool_size = pool_size
-        self.connections: List = []  # Здесь будут храниться клиенты новой API
+        self.connections: List = []
         self.locks: List[asyncio.Lock] = []
         self.initialized = False
         self.init_lock = asyncio.Lock()
@@ -2750,12 +2578,12 @@ class ConnectionPool:
             return
             
         async with self.init_lock:
-            if self.initialized:  # Double check
+            if self.initialized:
                 return
                 
             for _ in range(self.pool_size):
                 client = await get_client(token=self.api_key)
-                await client.account.fetch_me()  # Проверяем подключение
+                await client.account.fetch_me()
                 self.connections.append(client)
                 self.locks.append(asyncio.Lock())
                 
@@ -2784,29 +2612,23 @@ class ChatManager:
         self.message_tracker = MessageTracker(message_limit, time_window)
 
     async def send_message(self, user_id: int, message: str) -> str:
-        # Проверяем на спам
         if self.message_tracker.is_spam(user_id):
             logger.warning(f"Ignoring message from user {user_id} due to spam protection")
             return None
             
-        # Добавляем случайную задержку перед отправкой
         delay = random.uniform(self.min_delay, self.max_delay)
         logger.info(f"Waiting {delay:.1f} seconds before processing message for user {user_id}")
         await asyncio.sleep(delay)
         
-        # Создаем lock для пользователя если его нет
         if user_id not in self.chat_locks:
             self.chat_locks[user_id] = asyncio.Lock()
             
         try:
-            # Получаем соединение из пула
             conn_id, client, conn_lock = await self.pool.get_connection()
             
-            async with conn_lock:  # Блокируем соединение
+            async with conn_lock:
                 try:
-                    # Проверяем существует ли чат для пользователя
                     if user_id not in self.user_chats:
-                        # Создаем новый чат с новой API
                         chat, greeting_message = await client.chat.create_chat(self.char_id)
                         self.user_chats[user_id] = {
                             'chat_id': chat.chat_id,
@@ -2816,7 +2638,6 @@ class ChatManager:
                     
                     chat_data = self.user_chats[user_id]
                     
-                    # Отправляем сообщение с новой API
                     answer = await client.chat.send_message(
                         self.char_id,
                         chat_data['chat_id'],
@@ -2828,7 +2649,6 @@ class ChatManager:
                     
                 except SessionClosedError as e:
                     logger.error(f"Session closed for user {user_id}: {e}")
-                    # Удаляем чат при ошибке, чтобы он пересоздался
                     if user_id in self.user_chats:
                         del self.user_chats[user_id]
                     raise
@@ -2846,24 +2666,14 @@ class ChatManager:
         for client in self.pool.connections:
             await client.close_session()
 
-# Глобальный экземпляр менеджера чатов с новыми параметрами API
-chat_manager = ChatManager(
-    api_key='4d9f28f3e0446491d0b99e135e68e85f040f33aa',  # Ваш новый токен
-    char_id='cYXxq0NFDa8lHhgtiAdv-9a534eDWbg-YiUtIfX7yoE'  # Ваш новый character_id
-)
-
-
 async def ensure_group_exists(chat_id: int, chat_title: str) -> None:
-    """Check if group exists in database and create if not"""
     current_timestamp = int(datetime.now().timestamp())
     
     async with aiosqlite.connect(DB_NAME) as db:
-        # Check if group exists
         cursor = await db.execute('SELECT chat_id FROM groups WHERE chat_id = ?', (chat_id,))
         existing_group = await cursor.fetchone()
         
         if not existing_group:
-            # If group doesn't exist, create new entry
             await db.execute('''
                 INSERT INTO groups 
                 (chat_id, message_count, joined_timestamp, title, is_active)
@@ -2877,7 +2687,6 @@ async def group_message_handler(message: types.Message, bot: Bot):
         return
 
     try:
-        # Проверяем и добавляем группу, если её нет в БД
         async with aiosqlite.connect('database.db') as db:
             cursor = await db.execute(
                 'SELECT 1 FROM groups WHERE chat_id = ?',
@@ -2886,7 +2695,6 @@ async def group_message_handler(message: types.Message, bot: Bot):
             group_exists = await cursor.fetchone()
             
             if not group_exists:
-                # Группы нет в БД - добавляем
                 await db.execute(
                     '''INSERT INTO groups (chat_id, title, joined_timestamp) 
                     VALUES (?, ?, ?)''',
@@ -2894,7 +2702,7 @@ async def group_message_handler(message: types.Message, bot: Bot):
                 )
                 await db.execute(
                     'INSERT INTO group_config (chat_id, response_chance) VALUES (?, ?)',
-                    (message.chat.id, 1)  # Значение по умолчанию
+                    (message.chat.id, 1)
                 )
                 await db.commit()
                 logger.info(f"Добавлена новая группа в БД: {message.chat.title} (ID: {message.chat.id})")
@@ -3103,7 +2911,6 @@ async def private_message_handler(message: types.Message):
         ]
     )
     
-    # Сохраняем информацию о пользователе
     current_timestamp = int(datetime.now().timestamp())
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute('''
@@ -3112,7 +2919,6 @@ async def private_message_handler(message: types.Message):
         ''', (message.from_user.id, message.from_user.username, current_timestamp))
         await db.commit()
 
-    # Создаем FSInputFile для локального файла
     animation = FSInputFile("start.mp4")
     
     await message.answer_animation(
@@ -3142,7 +2948,6 @@ async def main():
             drop_pending_updates=True,
             timeout=30)
     finally:
-        # Сохраняем чаты перед завершением
         await bot.session.close()
         await chat_manager.close()
 
