@@ -489,9 +489,84 @@ async def handle_admin_command(message: Message, state: FSMContext):
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🏆 Выдать Premium", callback_data="admin_grant_group_premium")],
-        [InlineKeyboardButton(text="🗑 Удалить DB пользователя", callback_data="admin_delete_user")]
+        [InlineKeyboardButton(text="🗑 Удалить DB пользователя", callback_data="admin_delete_user")],
+        [InlineKeyboardButton(text="Рассылка", callback_data="broadcast")]
     ])
     await message.answer(text, reply_markup=keyboard)
+
+@router.callback_query(lambda c: c.data == "broadcast")
+async def handle_broadcast_callback(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_USER_ID:
+        return
+    
+    await callback.message.answer(
+        "📢 Введите сообщение для рассылки (можно с медиа):",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="admin_cancel")]
+        ]))
+    await state.set_state("broadcast_message")
+    await callback.answer()
+
+@router.message(StateFilter("broadcast_message"))
+async def process_broadcast_message(message: Message, state: FSMContext, bot: Bot):
+    if message.from_user.id != ADMIN_USER_ID:
+        return
+    
+    async with aiosqlite.connect(DB_NAME) as db:
+        # Получаем всех пользователей
+        cursor = await db.execute("SELECT user_id FROM users")
+        users = [row[0] for row in await cursor.fetchall()]
+        
+        cursor = await db.execute("SELECT group_id FROM groups WHERE is_active = TRUE")
+        groups = [row[0] for row in await cursor.fetchall()]
+    
+    total_recipients = len(users) + len(groups)
+    await message.answer(f"📢 Начинаю рассылку для {total_recipients} получателей...")
+    
+    message_to_send = message
+    
+    for i, user_id in enumerate(users, 1):
+        try:
+            await bot.copy_message(
+                chat_id=user_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id
+            )
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            logging.error(f"Ошибка при отправке пользователю {user_id}: {e}")
+        
+        if i % 20 == 0:
+            await message.answer(f"⏳ Отправлено {i}/{len(users)} пользователям...")
+    
+    # Отправляем группам
+    for j, group_id in enumerate(groups, 1):
+        try:
+            await bot.copy_message(
+                chat_id=group_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id
+            )
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            logging.error(f"Ошибка при отправке в группу {group_id}: {e}")
+        
+        if j % 10 == 0:
+            await message.answer(f"⏳ Отправлено {j}/{len(groups)} группам...")
+    
+    await message.answer(f"✅ Рассылка завершена!\n"
+                         f"👥 Пользователей: {len(users)}\n"
+                         f"💬 Групп: {len(groups)}")
+    await state.clear()
+
+@router.callback_query(lambda c: c.data == "admin_cancel")
+async def handle_admin_cancel(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_USER_ID:
+        return
+    
+    await state.clear()
+    await callback.message.answer("❌ Действие отменено")
+    await callback.answer()
 
 @router.callback_query(F.data == "admin_delete_user")
 async def start_delete_user(callback: CallbackQuery, state: FSMContext):
