@@ -453,6 +453,7 @@ class AdminStates(StatesGroup):
     GRANT_GROUP_DAYS = State()
     CONFIRM_USER_DELETE = State()
     waiting_for_views = State()
+    BROADCAST_MESSAGE = State()
 
 @router.message(Command("admin"))
 async def handle_admin_command(message: Message, state: FSMContext):
@@ -499,10 +500,10 @@ async def handle_broadcast_callback(callback: CallbackQuery, state: FSMContext):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="❌ Отмена", callback_data="admin_cancel")]
         ]))
-    await state.set_state("broadcast_message")
+    await state.set_state(AdminStates.BROADCAST_MESSAGE)
     await callback.answer()
 
-@router.message(StateFilter("broadcast_message"))
+@router.message(StateFilter(AdminStates.BROADCAST_MESSAGE))
 async def process_broadcast_message(message: Message, state: FSMContext, bot: Bot):
     if message.from_user.id != ADMIN_USER_ID:
         return
