@@ -57,7 +57,7 @@ router = Router()
 
 DB_NAME = 'database.db'
 REQUIRED_MESSAGES = 1
-ADMIN_USER_ID = 777777 # ADMIN ID
+ADMIN_USER_ID = 7777 # ADMIN ID
 STICKER_IDS = [] # STICKER IDS (OPTION)
 
 LOCAL_GIFS = {} # LOCAL GIFTS (OPTION)
@@ -509,11 +509,10 @@ async def process_broadcast_message(message: Message, state: FSMContext, bot: Bo
         return
     
     async with aiosqlite.connect(DB_NAME) as db:
-        # Получаем всех пользователей
         cursor = await db.execute("SELECT user_id FROM users")
         users = [row[0] for row in await cursor.fetchall()]
         
-        cursor = await db.execute("SELECT group_id FROM groups WHERE is_active = TRUE")
+        cursor = await db.execute("SELECT chat_id FROM groups WHERE is_active = TRUE")
         groups = [row[0] for row in await cursor.fetchall()]
     
     total_recipients = len(users) + len(groups)
@@ -535,7 +534,6 @@ async def process_broadcast_message(message: Message, state: FSMContext, bot: Bo
         if i % 20 == 0:
             await message.answer(f"⏳ Отправлено {i}/{len(users)} пользователям...")
     
-    # Отправляем группам
     for j, group_id in enumerate(groups, 1):
         try:
             await bot.copy_message(
