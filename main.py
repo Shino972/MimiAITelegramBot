@@ -55,14 +55,9 @@ logging.basicConfig(level=logging.INFO)
 
 router = Router()
 
-chat_manager = ChatManager(
-    api_key='',  # TOKEN ACCOUNT
-    char_id='cYXxq0NFDa8lHhgtiAdv-9a534eDWbg-YiUtIfX7yoE'  # CHARACTER ID
-)
-
 DB_NAME = 'database.db'
 REQUIRED_MESSAGES = 1
-ADMIN_USER_ID = # ADMIN ID
+ADMIN_USER_ID = 777777 # ADMIN ID
 STICKER_IDS = [] # STICKER IDS (OPTION)
 
 LOCAL_GIFS = {} # LOCAL GIFTS (OPTION)
@@ -803,7 +798,6 @@ async def process_group_premium_days(message: Message, state: FSMContext, bot: B
 
     except ValueError:
         await message.answer("❌ Некорректное число дней.")
-
 #==============================================================================================
 #==============================================================================================
 #==============================================================================================
@@ -2741,6 +2735,11 @@ class ChatManager:
         for client in self.pool.connections:
             await client.close_session()
 
+chat_manager = ChatManager(
+    api_key='',  # TOKEN ACCOUNT
+    char_id='cYXxq0NFDa8lHhgtiAdv-9a534eDWbg-YiUtIfX7yoE'  # CHARACTER ID
+)
+
 async def ensure_group_exists(chat_id: int, chat_title: str) -> None:
     current_timestamp = int(datetime.now().timestamp())
     
@@ -3009,8 +3008,8 @@ async def private_message_handler(message: types.Message):
 async def main():
     await init_db()
     bot = Bot(
-        token="8148475045:AAFq-CpuOLoidWwMZzFNCvbenB3mmy6fnKg",
-        default=DefaultBotProperties(parse_mode="HTML")
+        token="",
+        default=DefaultBotProperties(parse_mode="HTML") 
     )
     
     asyncio.create_task(check_expired_group_premium(bot))
